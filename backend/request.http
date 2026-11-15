@@ -1,0 +1,80 @@
+@baseUrl = http://localhost:3001
+@routineId = 9aa7f633-7ba6-47f7-bfdb-fe17e60577b2
+
+### 1. Ambil daftar awal
+GET {{baseUrl}}/routines
+
+
+### 2. Tambah routine
+POST {{baseUrl}}/routines
+Content-Type: application/json
+
+{
+  "nama": "Upper Body A",
+  "fokus": "Biseps, bahu, dan triseps",
+  "tanggalLatihan": "2026-11-20",
+  "tingkat": "pemula"
+}
+
+
+### 3. Ambil seluruh routine setelah POST
+GET {{baseUrl}}/routines
+
+
+### 4. Ambil satu routine
+GET {{baseUrl}}/routines/{{routineId}}
+
+
+### 5. Ubah routine
+PATCH {{baseUrl}}/routines/{{routineId}}
+Content-Type: application/json
+
+{
+  "fokus": "Dada, bahu, dan triseps",
+  "tingkat": "menengah",
+  "selesai": true
+}
+
+
+### 6. Uji nama duplikat
+POST {{baseUrl}}/routines
+Content-Type: application/json
+
+{
+  "nama": "Upper Body A",
+  "fokus": "Biseps dan bahu",
+  "tingkat": "pemula"
+}
+
+
+### 7. Uji validasi input
+POST {{baseUrl}}/routines
+Content-Type: application/json
+
+{
+  "nama": "AB",
+  "fokus": "Bahu",
+  "tanggalLatihan": "tanggal-salah",
+  "tingkat": "expert"
+}
+
+
+### 8. Uji validasi PATCH
+PATCH {{baseUrl}}/routines/{{routineId}}
+Content-Type: application/json
+
+{
+  "selesai": "ya"
+}
+
+
+### 9. Uji data tidak ditemukan
+GET {{baseUrl}}/routines/tidak-ada
+
+
+### 10. Hapus routine
+DELETE {{baseUrl}}/routines/{{routineId}}
+
+
+### 11. Periksa daftar setelah DELETE
+GET {{baseUrl}}/routines
