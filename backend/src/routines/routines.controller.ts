@@ -25,6 +25,11 @@ export class RoutinesController {
     return this.routinesService.findAll();
   }
 
+  @Get('stats')
+  getStats() {
+    return this.routinesService.getStats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.routinesService.findOne(id);

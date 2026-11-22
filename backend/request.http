@@ -1,5 +1,5 @@
 @baseUrl = http://localhost:3001
-@routineId = 9aa7f633-7ba6-47f7-bfdb-fe17e60577b2
+@routineId = 88b41a79-f9bf-45f7-80df-1e8cda4ad012
 
 ### 1. Ambil daftar awal
 GET {{baseUrl}}/routines
@@ -78,3 +78,6 @@ DELETE {{baseUrl}}/routines/{{routineId}}
 
 ### 11. Periksa daftar setelah DELETE
 GET {{baseUrl}}/routines
+
+### 12. Statistik routine (query lanjutan)
+GET {{baseUrl}}/routines/stats

@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Tingkat {
+  pemula
+  menengah
+  lanjutan
+}
+
+model Routine {
+  id             String    @id @default(uuid())
+  nama           String
+  fokus          String
+  tanggalLatihan DateTime?
+  tingkat        Tingkat   @default(pemula)
+  selesai        Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("routines")
+}

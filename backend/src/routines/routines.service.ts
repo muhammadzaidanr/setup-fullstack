@@ -4,107 +4,147 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-
-import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoutineDto } from './dto/create-routine.dto';
 import { UpdateRoutineDto } from './dto/update-routine.dto';
-import { Routine } from './entities/routine.entity';
 
 @Injectable()
 export class RoutinesService {
-  private routines: Routine[] = [];
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll(): Routine[] {
-    return [...this.routines].sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt),
-    );
+  findAll() {
+    return this.prisma.routine.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
-  findOne(id: string): Routine {
-    const routine = this.routines.find((item) => item.id === id);
+  async findOne(id: string) {
+    const routine = await this.prisma.routine.findUnique({
+      where: { id },
+    });
 
     if (!routine) {
-      throw new NotFoundException(
-        `Routine dengan id ${id} tidak ditemukan`,
-      );
+      throw new NotFoundException(`Routine dengan id ${id} tidak ditemukan`);
     }
 
     return routine;
   }
 
-  create(dto: CreateRoutineDto): Routine {
+  async create(dto: CreateRoutineDto) {
     const nama = dto.nama.trim();
     const fokus = dto.fokus.trim();
 
-    this.validasiRoutine(nama, fokus);
+    await this.validasiRoutine(nama, fokus);
 
-    const now = new Date().toISOString();
-
-    const routine: Routine = {
-      id: randomUUID(),
-      nama,
-      fokus,
-      tanggalLatihan: dto.tanggalLatihan ?? null,
-      tingkat: dto.tingkat ?? 'pemula',
-      selesai: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.routines.push(routine);
-
-    return routine;
-  }
-
-  update(id: string, dto: UpdateRoutineDto): Routine {
-    const routine = this.findOne(id);
-
-    const nama = dto.nama?.trim() ?? routine.nama;
-    const fokus = dto.fokus?.trim() ?? routine.fokus;
-
-    this.validasiRoutine(nama, fokus, id);
-
-    Object.assign(routine, {
-      nama,
-      fokus,
-      tanggalLatihan:
-        dto.tanggalLatihan === undefined
-          ? routine.tanggalLatihan
-          : dto.tanggalLatihan,
-      tingkat: dto.tingkat ?? routine.tingkat,
-      selesai: dto.selesai ?? routine.selesai,
-      updatedAt: new Date().toISOString(),
+    return this.prisma.routine.create({
+      data: {
+        nama,
+        fokus,
+        tanggalLatihan: dto.tanggalLatihan
+          ? new Date(dto.tanggalLatihan)
+          : null,
+        tingkat: dto.tingkat ?? 'pemula',
+      },
     });
-
-    return routine;
   }
 
-  remove(id: string): void {
-    const routine = this.findOne(id);
+  async update(id: string, dto: UpdateRoutineDto) {
+    const existing = await this.findOne(id);
 
-    this.routines = this.routines.filter(
-      (item) => item.id !== routine.id,
-    );
+    const nama = dto.nama?.trim() ?? existing.nama;
+    const fokus = dto.fokus?.trim() ?? existing.fokus;
+
+    await this.validasiRoutine(nama, fokus, id);
+
+    try {
+      return await this.prisma.routine.update({
+        where: { id },
+        data: {
+          nama,
+          fokus,
+          tanggalLatihan:
+            dto.tanggalLatihan === undefined
+              ? undefined
+              : dto.tanggalLatihan
+                ? new Date(dto.tanggalLatihan)
+                : null,
+          tingkat: dto.tingkat,
+          selesai: dto.selesai,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`Routine dengan id ${id} tidak ditemukan`);
+      }
+      throw error;
+    }
   }
 
-  private validasiRoutine(
+  async remove(id: string) {
+    try {
+      await this.prisma.routine.delete({
+        where: { id },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`Routine dengan id ${id} tidak ditemukan`);
+      }
+      throw error;
+    }
+  }
+
+    async getStats() {
+    const [total, selesai, belumSelesai, pemula, menengah, lanjutan] =
+      await Promise.all([
+        this.prisma.routine.count(),
+        this.prisma.routine.count({ where: { selesai: true } }),
+        this.prisma.routine.count({ where: { selesai: false } }),
+        this.prisma.routine.count({ where: { tingkat: 'pemula' } }),
+        this.prisma.routine.count({ where: { tingkat: 'menengah' } }),
+        this.prisma.routine.count({ where: { tingkat: 'lanjutan' } }),
+      ]);
+
+    return {
+      total,
+      selesai,
+      belumSelesai,
+      berdasarkanTingkat: {
+        pemula,
+        menengah,
+        lanjutan,
+      },
+    };
+  }
+
+  private async validasiRoutine(
     nama: string,
     fokus: string,
     abaikanId?: string,
-  ): void {
+  ): Promise<void> {
     if (nama.length < 3 || fokus.length < 3) {
       throw new BadRequestException(
         'Nama dan fokus minimal 3 karakter setelah spasi tepi dihapus',
       );
     }
 
-    const namaSudahAda = this.routines.some(
-      (item) =>
-        item.id !== abaikanId &&
-        item.nama.toLowerCase() === nama.toLowerCase(),
-    );
+    const duplikat = await this.prisma.routine.findFirst({
+      where: {
+        nama: {
+          equals: nama,
+          mode: 'insensitive',
+        },
+        ...(abaikanId ? { NOT: { id: abaikanId } } : {}),
+      },
+    });
 
-    if (namaSudahAda) {
+    if (duplikat) {
       throw new ConflictException(
         `Routine dengan nama "${nama}" sudah tersedia`,
       );
